@@ -1,0 +1,56 @@
+# HorizontalPodAutoscaler (autoscaling/v2).
+#
+# The controller compares the *average CPU utilisation across all ready Pods*
+# with the target. Utilisation is a percentage of `resources.requests.cpu`, not
+# of the node and not of the limit:
+#
+#   200m request, 50% target  ->  scale when average CPU > 100m per Pod
+#
+# `behavior` is optional; the defaults are intentionally slow in both
+# directions (300 s scale-down stabilisation). The values below make the lab
+# observable in a few minutes without making the workload flap.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: login-screen
+  labels:
+    app.kubernetes.io/name: login-screen
+    app.kubernetes.io/part-of: lab05-scaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: login-screen
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleUp:
+      # Do not wait for a quiet window when load arrives: add Pods immediately.
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+    scaleDown:
+      # Wait two minutes before removing anything, then remove at most two Pods
+      # per 30 s. A short spike must not tear down a warm fleet.
+      stabilizationWindowSeconds: 120
+      selectPolicy: Min
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30

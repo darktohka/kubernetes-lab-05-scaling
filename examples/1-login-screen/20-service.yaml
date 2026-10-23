@@ -1,0 +1,16 @@
+# A stable address for the Pods. The HPA changes the number of endpoints behind
+# this Service; clients keep using one DNS name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: login-screen
+  labels:
+    app.kubernetes.io/name: login-screen
+    app.kubernetes.io/part-of: lab05-scaling
+spec:
+  selector:
+    app.kubernetes.io/name: login-screen
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

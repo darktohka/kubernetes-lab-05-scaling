@@ -1,0 +1,77 @@
+# Load generator for the HPA demo.
+#
+# Each Pod posts a real login form to the Service, so the server performs one
+# Argon2id verification per request. Two replicas with a 200 ms pause produce a
+# few requests per second - enough to push the replicas into the autoscaler's
+# range (about seven Pods on the lab cluster), and small enough that the cluster
+# stays usable.
+#
+# Delete this Deployment to stop the load; the HPA will scale back down.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  labels:
+    app.kubernetes.io/name: load-generator
+    app.kubernetes.io/part-of: lab05-scaling
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: load-generator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: load-generator
+        app.kubernetes.io/part-of: lab05-scaling
+    spec:
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: curl
+          image: curlimages/curl:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -u
+              URL="${TARGET_URL:-http://login-screen/login}"
+              SLEEP="${LOAD_SLEEP:-0.2}"
+
+              echo "load-generator: POST $URL every ${SLEEP}s"
+              while true; do
+                code=$(curl -sS --max-time 10 -o /dev/null \
+                  -w '%{http_code}' \
+                  -H 'Accept: application/json' \
+                  --data-urlencode "username=${LOGIN_USER:-student}" \
+                  --data-urlencode "password=${LOGIN_PASSWORD:-testpassword}" \
+                  "$URL" 2>/dev/null) || code="curl-error"
+                printf '%s %s\n' "$(date -u +%H:%M:%S)" "$code"
+                sleep "$SLEEP"
+              done
+          env:
+            - name: TARGET_URL
+              value: http://login-screen/login
+            - name: LOAD_SLEEP
+              value: "0.2"
+            - name: LOGIN_USER
+              value: student
+            - name: LOGIN_PASSWORD
+              value: testpassword
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi

@@ -1,0 +1,60 @@
+# The workload the HorizontalPodAutoscaler scales.
+#
+# Two details matter more than anything else in this file:
+#
+#   * `resources.requests.cpu: 200m` is the denominator of the HPA's CPU
+#     utilisation calculation. 50% means 100m of CPU *average per Pod*.
+#   * `resources.limits.cpu: 500m` caps each Pod, so one replica can never run
+#     away with a whole node while the autoscaler catches up.
+#
+# Everything else (probes, non-root, dropped capabilities) is what you would
+# want in a real Deployment anyway.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: login-screen
+  labels:
+    app.kubernetes.io/name: login-screen
+    app.kubernetes.io/part-of: lab05-scaling
+spec:
+  # The HPA owns this number after it is created. Keeping a sensible value here
+  # means the Deployment also works when you apply it without an HPA.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: login-screen
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: login-screen
+        app.kubernetes.io/part-of: lab05-scaling
+    spec:
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: lighthouse.tohka.us/example-projects/login-screen-bun:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 200m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

@@ -1,0 +1,28 @@
+# Optional: publish the login screen at https://login.<username>.sapi.click
+#
+# The shared cluster publishes the DNS record and obtains the certificate
+# automatically from `tls:` alone - there are no annotations to copy. Change
+# the host to your own namespace before applying.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: login-screen
+  labels:
+    app.kubernetes.io/name: login-screen
+    app.kubernetes.io/part-of: lab05-scaling
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: logindani.sapi.click
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: login-screen
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - logindani.sapi.click
